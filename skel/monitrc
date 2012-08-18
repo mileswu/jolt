@@ -1,0 +1,13 @@
+set daemon 30
+set logfile __JOLTDIR__/monit.log
+set statefile __JOLTDIR__/monit.state
+
+set httpd port __PORT__ and use the address 127.0.0.1
+	allow __USER__:__RANDPW__
+
+
+
+#set mailserver localhost
+#set mail-format { from: __MONITEMAIL__ }
+
+include __JOLTDIR__/monit.d/*.monit
