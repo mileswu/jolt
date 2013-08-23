@@ -51,6 +51,8 @@ def runInit():
 			print('  ln -s %s %s' % (JOLT_USER + '/monitrc', home + '/.monitrc'))
 	else:
 		os.symlink(JOLT_USER + '/monitrc', home + '/.monitrc')
+		
+	os.mkdir(JOLT_USER + '/monit.d')
 	
 	# Create empty provisioned file list as it's new
 	saveProvisionedFile([])
