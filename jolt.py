@@ -4,11 +4,13 @@ import os
 import shutil
 import string
 import stat
+import re
 
 COMMANDS=['init', 'new']
 JOLT_SKEL='/home/mileswu/jolt-src/skel'
 JOLT_GLOBAL='/home/mileswu/jolt-src/global'
 
+JOLT_USER= os.environ['HOME'] + '/jolt2'
 
 def provisionNewFile(path, filename):
 	try:
@@ -29,24 +31,22 @@ def provisionNewFile(path, filename):
 	output_file.close()
 
 def runInit():
-	home = os.environ['HOME']
-	path = home + '/jolt2'
-	if os.path.exists(path):
-		print('You already have a jolt config set up at %s' % path)
+	if os.path.exists(JOLT_USER):
+		print('You already have a jolt config set up at %s' % JOLT_USER)
 		sys.exit(1)
 	
-	os.mkdir(path)
-	provisionNewFile(path, 'monitrc')
-	os.chmod(path + '/monitrc', stat.S_IWUSR | stat.S_IRUSR)
+	os.mkdir(JOLT_USER)
+	provisionNewFile(JOLT_USER, 'monitrc')
+	os.chmod(JOLT_USER + '/monitrc', stat.S_IWUSR | stat.S_IRUSR)
+	home = os.environ['HOME']
 	if os.path.lexists(home + '/.monitrc'):
-		if os.path.realpath(home + '/.monitrc') != path + '/monitrc':
+		if os.path.realpath(home + '/.monitrc') != JOLT_USER + '/monitrc':
 			print('For some reason you already have a .monitrc file in your home dir. Skipping creating the symbolic link. Without this done, your services may not start.')
 			print('If you are sure you want to use jolt\'s configuration run:')
 			print('  rm %s' % home + '/.monitrc')
-			print('  ln -s %s %s' % (path + '/monitrc', home + '/.monitrc'))
+			print('  ln -s %s %s' % (JOLT_USER + '/monitrc', home + '/.monitrc'))
 	else:
-		os.symlink(path + '/monitrc', home + '/.monitrc')
-
+		os.symlink(JOLT_USER + '/monitrc', home + '/.monitrc')
 	os.system('monit')
 
 
