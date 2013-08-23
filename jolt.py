@@ -5,6 +5,7 @@ import shutil
 import string
 import stat
 import re
+import subprocess
 
 JOLT_SKEL='/home/mileswu/jolt-src/skel'
 JOLT_GLOBAL='/home/mileswu/jolt-src/global'
@@ -15,32 +16,31 @@ JOLT_USER= os.environ['HOME'] + '/jolt2'
 STARTING_PORT = 54121
 MAX_PORT = 56000
 
-def provisionNewFile(path, filename):
-	try:
-		input_file = open(JOLT_SKEL + '/' + filename, 'r')
-		output_file = open(path + '/' + filename, 'w')
-	except:
-		print("Some kind of IO error. Perhaps missing files in the skeleton?")
-		sys.exit(1)
-
-	port = str(getPort(os.environ['USER'], 'monit', 'monit'))
-	for line in input_file:
-		line = string.replace(line, '__JOLTDIR__', path)
-		line = string.replace(line, '__PORT__', port)
-		line = string.replace(line, '__USER__', os.environ['USER'])
-		line = string.replace(line, '__RANDPW__', 'hi')
-		output_file.write(line)
-	
-	input_file.close()
-	output_file.close()
-
 def runInit():
 	if os.path.exists(JOLT_USER):
 		print('You already have a jolt config set up at %s' % JOLT_USER)
 		sys.exit(1)
 	
 	os.mkdir(JOLT_USER)
-	provisionNewFile(JOLT_USER, 'monitrc')
+	
+	try:
+		input_file = open(JOLT_SKEL + '/monitrc', 'r')
+		output_file = open(JOLT_USER + '/monitrc', 'w')
+	except:
+		print("Some kind of IO error. Perhaps missing files in the skeleton?")
+		sys.exit(1)
+
+	port = str(getPort(os.environ['USER'], 'monit', 'monit'))
+	for line in input_file:
+		line = line.replace('__JOLTDIR__', JOLT_USER)
+		line = line.replace('__PORT__', port)
+		line = line.replace('__USER__', os.environ['USER'])
+		line = line.replace('__RANDPW__', 'hi')
+		output_file.write(line)
+	
+	input_file.close()
+	output_file.close()
+	
 	os.chmod(JOLT_USER + '/monitrc', stat.S_IWUSR | stat.S_IRUSR)
 	home = os.environ['HOME']
 	if os.path.lexists(home + '/.monitrc'):
@@ -58,6 +58,19 @@ def runInit():
 	saveProvisionedFile([])
 	
 	os.system('monit')
+	
+def runPortsNew():
+	if len(sys.argv) < 5:
+		print('Usage: %s ports new <service> <name>' % sys.argv[0])
+		sys.exit(1)
+	
+	service = sys.argv[3]
+	name = sys.argv[4]
+	if service.isalnum() == False or name.isalnum() == False:
+		print('Invalid characters in service/name')
+	
+	p = getPort(os.environ['USER'], service, name)
+	print('%d' % p)
 	
 def getPort(user, service, name):
 	ports = loadPortFile()
@@ -90,7 +103,7 @@ def savePortFile(ports):
 	try:
 		ports_file = open(JOLT_GLOBAL + "/jolt.ports", 'w')
 	except:
-		print "Some IO error"
+		print("Some IO error")
 		sys.exit(1)
 
 	for i in ports:
@@ -103,11 +116,12 @@ def runPortsList():
 	ports = loadPortFile()
 	for i in ports:
 		print('    %d: %s - %s - %s' % (i['port'], i['user'], i['service'], i['name']) )
+	
 def loadProvisionedFile():
 	try:
 		provisioned_file = open(JOLT_USER + "/jolt.provisioned", 'r')
 	except:
-		print "Provisioned file not found"
+		print("Provisioned file not found")
 		sys.exit(1)
 		
 	retval = []
@@ -124,7 +138,7 @@ def saveProvisionedFile(provisioned_services):
 	try:
 		provisioned_file = open(JOLT_USER + "/jolt.provisioned", 'w')
 	except:
-		print "Some IO error"
+		print("Some IO error")
 		sys.exit(1)
 	
 	for i in provisioned_services:
@@ -137,12 +151,11 @@ def runList():
 	try:
 		skels = os.listdir(JOLT_SKEL)
 	except:
-		print "Some IO error"
+		print("Some IO error")
 		sys.exit(1)
 		
-	filter_lambda = lambda filename: filename.endswith('.yml')
-	map_lambda = lambda filename: filename[0:-4]
-	skels = sorted(map(map_lambda, filter(filter_lambda, skels)))
+	filter_lambda = lambda filename: os.path.isdir(JOLT_SKEL + '/' + filename)
+	skels = sorted(filter(filter_lambda, skels))
 	for i in skels:
 		print('    %s' % i)
 	
@@ -151,6 +164,41 @@ def runList():
 	for i in provisioned_services:
 		print('    %s - %s' % (i['service'], i['name']) )
 
+def runNew():
+	if len(sys.argv) < 4:
+		print('Usage: %s new <service> <name>' % sys.argv[0])
+		sys.exit(1)
+	
+	service = sys.argv[2]
+	name = sys.argv[3]
+	if service.isalnum() == False or name.isalnum() == False:
+		print('Invalid characters in service/name')
+	
+	if os.path.isdir(JOLT_SKEL + '/' + service) == False:
+		print('Unknown service')
+		sys.exit(1)
+		
+	prov = loadProvisionedFile()
+	if { 'service' : service, 'name': name } in prov:
+		print('This already exists')
+		sys.exit(1)
+	
+	if os.path.isfile(JOLT_SKEL + '/' + service + '/_jolt.sh') == False:
+		print('Service definition is invalid')
+		sys.exit(1)
+	
+	os.environ['JOLTDIR'] = JOLT_USER
+	os.environ['JOLTNAME'] = name
+	os.environ['JOLTSERVICE'] = service
+	os.environ['JOLTBIN'] = os.path.abspath(__file__)
+	os.environ['JOLTMONITD'] = JOLT_USER + '/monit.d'
+	subprocess.call(JOLT_SKEL + '/' + service + '/_jolt.sh', cwd=JOLT_SKEL + '/' + service)
+	
+	prov.append({ 'service' : service, 'name': name })
+	saveProvisionedFile(prov)
+	
+	os.system('monit reload')
+	
 
 if len(sys.argv) < 2:
 	print('Usage: %s <command>' % sys.argv[0])
@@ -162,5 +210,15 @@ if sys.argv[1] == 'init':
 if sys.argv[1] == 'list':
 	runList()
 if sys.argv[1] == 'ports':
-	runPortsList()
+	if len(sys.argv) == 2:
+		runPortsList()
+	else:
+		if sys.argv[2] == 'new':
+			runPortsNew()
+		else:
+			print('Usage: %s ports <command>' % sys.argv[0])
+			print('where <command> is one of the following: new')
+			sys.exit(1)
+if sys.argv[1] == 'new' :
+	runNew()
 
