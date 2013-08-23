@@ -1,0 +1,21 @@
+#!/bin/bash
+
+PORT=`$JOLTBIN ports new $JOLTSERVICE $JOLTNAME`
+
+mkdir $JOLTDIR/$JOLTSERVICE-$JOLTNAME
+cp redis.conf $JOLTDIR/$JOLTSERVICE-$JOLTNAME/redis.conf.tmp
+cp redis.monit $JOLTMONITD/$JOLTSERVICE-$JOLTNAME.monit.tmp
+
+
+sed -e "s!__JOLTDIR__!$JOLTDIR!g" \
+	-e "s!__PORT__!$PORT!g" \
+	-e "s!__JOLTNAME__!$JOLTNAME!g" \
+	$JOLTDIR/$JOLTSERVICE-$JOLTNAME/redis.conf.tmp > $JOLTDIR/$JOLTSERVICE-$JOLTNAME/redis.conf
+
+sed -e "s!__JOLTDIR__!$JOLTDIR!g" \
+	-e "s!__PORT__!$PORT!g" \
+	-e "s!__JOLTNAME__!$JOLTNAME!g" \
+	$JOLTMONITD/$JOLTSERVICE-$JOLTNAME.monit.tmp > $JOLTMONITD/$JOLTSERVICE-$JOLTNAME.monit
+
+rm $JOLTDIR/$JOLTSERVICE-$JOLTNAME/redis.conf.tmp
+rm $JOLTMONITD/$JOLTSERVICE-$JOLTNAME.monit.tmp

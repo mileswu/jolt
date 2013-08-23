@@ -1,0 +1,5 @@
+check process redis-__JOLTNAME__ with pidfile "__JOLTDIR__/redis-__JOLTNAME__/redis.pid"
+        start program = "/sbin/start-stop-daemon -S -p __JOLTDIR__/redis-__JOLTNAME__/redis.pid --exec /usr/sbin/redis-server -- __JOLTDIR__/redis-__JOLTNAME__/redis.conf"
+        stop program = "/sbin/start-stop-daemon -K -p __JOLTDIR__/redis-__JOLTNAME__/redis.pid"
+        mode active
+        if 5 restarts within 10 cycles then stop
