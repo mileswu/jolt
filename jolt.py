@@ -6,9 +6,9 @@ import string
 import stat
 import re
 
-COMMANDS=['init', 'new']
 JOLT_SKEL='/home/mileswu/jolt-src/skel'
 JOLT_GLOBAL='/home/mileswu/jolt-src/global'
+COMMANDS=['init', 'new', 'list']
 
 JOLT_USER= os.environ['HOME'] + '/jolt2'
 
@@ -47,7 +47,59 @@ def runInit():
 			print('  ln -s %s %s' % (JOLT_USER + '/monitrc', home + '/.monitrc'))
 	else:
 		os.symlink(JOLT_USER + '/monitrc', home + '/.monitrc')
+	
+	# Create empty provisioned file list as it's new
+	saveProvisionedFile([])
+	
 	os.system('monit')
+	
+def loadProvisionedFile():
+	try:
+		provisioned_file = open(JOLT_USER + "/jolt.provisioned", 'r')
+	except:
+		print "Provisioned file not found"
+		sys.exit(1)
+		
+	retval = []
+	for line in provisioned_file:
+		m = re.search('(\w+)\s+(\w+)', line)
+		if m == None:
+			print('Invalid entry in provisioned file (%s)' % line)
+			print('Changes could be lost')
+		retval.append({ 'service' : m.group(1), 'name': m.group(2) })
+	
+	return retval
+	
+def saveProvisionedFile(provisioned_services):
+	try:
+		provisioned_file = open(JOLT_USER + "/jolt.provisioned", 'w')
+	except:
+		print "Some IO error"
+		sys.exit(1)
+	
+	for i in provisioned_services:
+		provisioned_file.write("%s %s\n" % (i['service'], i['name']) )
+	
+	provisioned_file.close()
+	
+def runList():
+	print('Available skeletons:')
+	try:
+		skels = os.listdir(JOLT_SKEL)
+	except:
+		print "Some IO error"
+		sys.exit(1)
+		
+	filter_lambda = lambda filename: filename.endswith('.yml')
+	map_lambda = lambda filename: filename[0:-4]
+	skels = sorted(map(map_lambda, filter(filter_lambda, skels)))
+	for i in skels:
+		print('    %s' % i)
+	
+	print('Installed services:')
+	provisioned_services = loadProvisionedFile()
+	for i in provisioned_services:
+		print('    %s - %s' % (i['service'], i['name']) )
 
 
 if len(sys.argv) < 2:
@@ -57,4 +109,6 @@ if len(sys.argv) < 2:
 
 if sys.argv[1] == 'init':
 	runInit()
+if sys.argv[1] == 'list':
+	runList()
 
