@@ -84,13 +84,19 @@ def getPort(user, service, name):
 			return i
 
 def loadPortFile():
-	try:
-		provisioned_file = open(JOLT_GLOBAL + "/jolt.ports", 'r')
-	except:
-		return []
+	lines = []
+	filenames = os.listdir(JOLT_GLOBAL + '/ports')
+	for filename in filenames:
+		if filename == '..' or filenmae == '.':
+			continue
+		try:
+			f = open(JOLT_GLOBAL + '/ports/' + filename, 'r')
+		except:
+			print("Some IO error with %s", filename)
+		lines.extend(f.readlines())
 
 	retval = []
-	for line in provisioned_file:
+	for line in lines:
 		m = re.search('(\d+)\s+(\w+)\s+(\w+)\s+(\w+)', line)
 		if m == None:
 			print('Invalid entry in port file (%s)' % line)
@@ -101,11 +107,13 @@ def loadPortFile():
 
 def savePortFile(ports):
 	try:
-		ports_file = open(JOLT_GLOBAL + "/jolt.ports", 'w')
+		ports_file = open(JOLT_GLOBAL + '/ports/' + os.environ['USER'], 'w')
 	except:
 		print("Some IO error")
 		sys.exit(1)
-
+	
+	filter_lambda = lambda i: i['user'] == os.environ['USER']
+	ports = filter(filter_lambda, ports)
 	for i in ports:
 		ports_file.write("%d %s %s %s\n" % (i['port'], i['user'], i['service'], i['name']) )
 
