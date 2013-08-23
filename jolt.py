@@ -8,9 +8,12 @@ import re
 
 JOLT_SKEL='/home/mileswu/jolt-src/skel'
 JOLT_GLOBAL='/home/mileswu/jolt-src/global'
-COMMANDS=['init', 'new', 'list']
+COMMANDS=['init', 'new', 'list', 'ports']
 
 JOLT_USER= os.environ['HOME'] + '/jolt2'
+
+STARTING_PORT = 54121
+MAX_PORT = 56000
 
 def provisionNewFile(path, filename):
 	try:
@@ -20,9 +23,10 @@ def provisionNewFile(path, filename):
 		print("Some kind of IO error. Perhaps missing files in the skeleton?")
 		sys.exit(1)
 
+	port = str(getPort(os.environ['USER'], 'monit', 'monit'))
 	for line in input_file:
 		line = string.replace(line, '__JOLTDIR__', path)
-		line = string.replace(line, '__PORT__', '1234')
+		line = string.replace(line, '__PORT__', port)
 		line = string.replace(line, '__USER__', os.environ['USER'])
 		line = string.replace(line, '__RANDPW__', 'hi')
 		output_file.write(line)
@@ -53,6 +57,50 @@ def runInit():
 	
 	os.system('monit')
 	
+def getPort(user, service, name):
+	ports = loadPortFile()
+	map_lambda = lambda i: i['port']
+	ps = map(map_lambda, ports)
+	
+	for i in range(STARTING_PORT, MAX_PORT):
+		if i not in ps: 
+			ports.append({ 'port' : i, 'user' : user, 'service' : service, 'name': name })
+			savePortFile(ports)
+			return i
+
+def loadPortFile():
+	try:
+		provisioned_file = open(JOLT_GLOBAL + "/jolt.ports", 'r')
+	except:
+		return []
+
+	retval = []
+	for line in provisioned_file:
+		m = re.search('(\d+)\s+(\w+)\s+(\w+)\s+(\w+)', line)
+		if m == None:
+			print('Invalid entry in port file (%s)' % line)
+			print('Changes could be lost')
+		retval.append({ 'port' : int(m.group(1)), 'user' : m.group(2), 'service' : m.group(3), 'name': m.group(4) })
+
+	return retval
+
+def savePortFile(ports):
+	try:
+		ports_file = open(JOLT_GLOBAL + "/jolt.ports", 'w')
+	except:
+		print "Some IO error"
+		sys.exit(1)
+
+	for i in ports:
+		ports_file.write("%d %s %s %s\n" % (i['port'], i['user'], i['service'], i['name']) )
+
+	ports_file.close()
+	
+def runPortsList():
+	print('Currently used ports:')
+	ports = loadPortFile()
+	for i in ports:
+		print('    %d: %s - %s - %s' % (i['port'], i['user'], i['service'], i['name']) )
 def loadProvisionedFile():
 	try:
 		provisioned_file = open(JOLT_USER + "/jolt.provisioned", 'r')
@@ -111,4 +159,6 @@ if sys.argv[1] == 'init':
 	runInit()
 if sys.argv[1] == 'list':
 	runList()
+if sys.argv[1] == 'ports':
+	runPortsList()
 
