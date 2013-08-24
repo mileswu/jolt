@@ -1,0 +1,5 @@
+check process nginx-__JOLTNAME__ with pidfile "__JOLTDIR__/nginx-__JOLTNAME__/nginx.pid"
+        start program = "/sbin/start-stop-daemon -S -p __JOLTDIR__/nginx-__JOLTNAME__/nginx.pid --exec /usr/sbin/nginx -- -c __JOLTDIR__/nginx-__JOLTNAME__/nginx.conf"
+        stop program = "/sbin/start-stop-daemon -K -p __JOLTDIR__/nginx-__JOLTNAME__/nginx.pid"
+        mode active
+        if 5 restarts within 10 cycles then stop

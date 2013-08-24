@@ -1,0 +1,56 @@
+#!/usr/bin/python
+
+import os
+from jolt import loadWWWFile, loadPortFile, JOLT_GLOBAL
+
+wwws = loadWWWFile()
+ports = loadPortFile()
+
+output = open(JOLT_GLOBAL + '/nginx.conf', 'w')
+
+def http(output, website, wwwport):
+	output.write("server { \n")
+	output.write("listen 80;\n")
+	output.write("server_name %s;\n" % website)
+	output.write("location / {\n")
+	output.write("proxy_pass http://127.0.0.1:%d;\n" % wwwport)
+	output.write("}\n")
+	output.write("}\n")
+	output.write("\n\n")
+	
+def https(output, website, wwwport):
+	output.write("server { \n")
+	output.write("listen 443;\n")
+	output.write("ssl on;\n")
+	output.write("ssl_certificate " + JOLT_GLOBAL + "/ssl/" + website + ".crt;" )
+	output.write("ssl_certificate_key " + JOLT_GLOBAL + "/ssl/" + website + ".key;" )
+	output.write("server_name %s;\n" % website)
+	output.write("location / {\n")
+	output.write("proxy_pass http://127.0.0.1:%d;\n" % wwwport)
+	output.write("}\n")
+	output.write("}\n")
+	output.write("server { \n")
+	output.write("listen 80;\n")
+	output.write("server_name %s;\n" % website)
+	output.write("rewrite ^ https://$server_name$request_uri? permanent;\n")
+	output.write("}\n")
+	output.write("\n\n")	
+	
+
+for i in wwws:
+	wwwports = list(filter(lambda x: x['user'] == i['user'] and x['service'] + "-" + x['name'] == i['wwwservice'], ports))
+	if len(wwwports) == 0:
+		print("For some reason the port is missing")
+		continue;
+	wwwport = wwwports[0]['port']
+		
+	if i['type'] == "http":
+		http(output, i['website'], wwwport)
+	elif i['type'] == "https":
+		if os.path.isfile(JOLT_GLOBAL + "/ssl/" + i['website'] + ".key") and os.path.isfile(JOLT_GLOBAL + "/ssl/" + i['website'] + ".crt"):
+			https(output, i['website'], wwwport)
+		else:
+			print("SSL certs missing for %s", i['website'])
+
+output.close()
+os.system("/etc/init.d/nginx reload")

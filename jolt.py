@@ -7,11 +7,11 @@ import stat
 import re
 import subprocess
 
-JOLT_SKEL='/home/mileswu/jolt-src/skel'
-JOLT_GLOBAL='/home/mileswu/jolt-src/global'
-COMMANDS=['init', 'new', 'list', 'ports']
+JOLT_SKEL='/var/lib/jolt/skel'
+JOLT_GLOBAL='/var/lib/jolt/global'
+COMMANDS=['init', 'new', 'list', 'ports', 'www']
 
-JOLT_USER= os.environ['HOME'] + '/jolt2'
+JOLT_USER= os.environ['HOME'] + '/jolt'
 
 STARTING_PORT = 54121
 MAX_PORT = 56000
@@ -75,7 +75,7 @@ def runPortsNew():
 def getPort(user, service, name):
 	ports = loadPortFile()
 	map_lambda = lambda i: i['port']
-	ps = map(map_lambda, ports)
+	ps = list(map(map_lambda, ports))
 	
 	for i in range(STARTING_PORT, MAX_PORT):
 		if i not in ps: 
@@ -87,7 +87,7 @@ def loadPortFile():
 	lines = []
 	filenames = os.listdir(JOLT_GLOBAL + '/ports')
 	for filename in filenames:
-		if filename == '..' or filenmae == '.':
+		if filename == '..' or filename == '.':
 			continue
 		try:
 			f = open(JOLT_GLOBAL + '/ports/' + filename, 'r')
@@ -101,7 +101,8 @@ def loadPortFile():
 		if m == None:
 			print('Invalid entry in port file (%s)' % line)
 			print('Changes could be lost')
-		retval.append({ 'port' : int(m.group(1)), 'user' : m.group(2), 'service' : m.group(3), 'name': m.group(4) })
+		else:
+			retval.append({ 'port' : int(m.group(1)), 'user' : m.group(2), 'service' : m.group(3), 'name': m.group(4) })
 
 	return retval
 
@@ -113,7 +114,7 @@ def savePortFile(ports):
 		sys.exit(1)
 	
 	filter_lambda = lambda i: i['user'] == os.environ['USER']
-	ports = filter(filter_lambda, ports)
+	ports = list(filter(filter_lambda, ports))
 	for i in ports:
 		ports_file.write("%d %s %s %s\n" % (i['port'], i['user'], i['service'], i['name']) )
 
@@ -138,7 +139,8 @@ def loadProvisionedFile():
 		if m == None:
 			print('Invalid entry in provisioned file (%s)' % line)
 			print('Changes could be lost')
-		retval.append({ 'service' : m.group(1), 'name': m.group(2) })
+		else:
+			retval.append({ 'service' : m.group(1), 'name': m.group(2) })
 	
 	return retval
 	
@@ -207,26 +209,167 @@ def runNew():
 	
 	os.system('monit reload')
 	
+def loadWWWFile():
+	lines = []
+	filenames = os.listdir(JOLT_GLOBAL + '/www')
+	for filename in filenames:
+		if filename == '..' or filename == '.':
+			continue
+		try:
+			f = open(JOLT_GLOBAL + '/www/' + filename, 'r')
+		except:
+			print("Some IO error with %s", filename)
+		lines.extend(f.readlines())
 
-if len(sys.argv) < 2:
-	print('Usage: %s <command>' % sys.argv[0])
-	print('where <command> is one of the following: %s' % ", ".join(COMMANDS))
-	sys.exit(1)
-
-if sys.argv[1] == 'init':
-	runInit()
-if sys.argv[1] == 'list':
-	runList()
-if sys.argv[1] == 'ports':
-	if len(sys.argv) == 2:
-		runPortsList()
-	else:
-		if sys.argv[2] == 'new':
-			runPortsNew()
+	retval = []
+	for line in lines:
+		m = re.search('(\w+)\t+(\w+)\t+([\w\.\*\-]+)\t+([\w\-]+)\t+([\w\.\-\/]+)', line)
+		if m == None:
+			print('Invalid entry in WWW file (%s)' % line)
+			print('Changes could be lost')
 		else:
-			print('Usage: %s ports <command>' % sys.argv[0])
-			print('where <command> is one of the following: new')
+			retval.append({ 'website' : m.group(3), 'type' : m.group(2), 'user' : m.group(1), 'wwwservice' : m.group(4), 'name': m.group(5) })
+
+	return retval
+
+def saveWWWFile(wwws):
+	try:
+		wwws_file = open(JOLT_GLOBAL + '/www/' + os.environ['USER'], 'w')
+	except:
+		print("Some IO error")
+		sys.exit(1)
+
+	filter_lambda = lambda i: i['user'] == os.environ['USER']
+	wwws = list(filter(filter_lambda, wwws))
+	for i in wwws:
+		wwws_file.write("%s\t%s\t%s\t%s\t%s\n" % (i['user'], i['type'], i['website'], i['wwwservice'], i['name']) )
+
+	wwws_file.close()
+
+def runWWWList():
+	print('Currently registered websites:')
+	wwws = loadWWWFile()
+	for i in wwws:
+		print('    %s: %s - %s %s - %s' % (i['user'], i['type'], i['website'], i['wwwservice'], i['name']) )
+
+def runWWWNew():
+	if len(sys.argv) < 6:
+		print('Usage: %s www new <type> <website> <folder or service> [<wwwservice>]' % sys.argv[0])
+		sys.exit(1)
+
+	type = sys.argv[3]
+	website = sys.argv[4]
+	folderservice = sys.argv[5]
+	
+	wwws = loadWWWFile()
+	if website in list(map(lambda x: x['website'], wwws)):
+		print('This website is already registered')
+		sys.exit(1)
+	
+	prov = loadProvisionedFile()
+	if re.match('[\*\w\.]+$', website) == None:
+		print('Website invalid format')
+		sys.exit(1)
+	
+	if len(sys.argv) == 6:
+		available_wwwservice = list(filter(lambda x: x['service'] == 'nginx', prov))
+		if len(available_wwwservice) == 0:
+			print('You must provision nginx first')
 			sys.exit(1)
-if sys.argv[1] == 'new' :
-	runNew()
+		wwwservice = available_wwwservice[0]['service'] + "-" + available_wwwservice[0]['name']
+		print("Assuming %s" % wwwservice)
+	else:
+		wwwservice = sys.argv[6]
+		if wwwservice not in list(map(lambda x: x['service'] + "-" + x['name'], prov)):
+			print('Unreognized www service')
+			sys.exit(1)
+	
+	ports = loadPortFile()
+	wwwports = list(filter(lambda x: x['user'] == os.environ['USER'] and x['service'] + "-" + x['name'] == wwwservice, ports))
+	if len(wwwports) == 0:
+		print("For some reason the port is missing")
+		sys.exit(1)
+	wwwport = wwwports[0]['port']
+	
+	if os.path.isdir(folderservice):
+		folderorservice = "folder"
+		folderservice = os.path.abspath(folderservice)
+	elif folderservice in list(map(lambda x: x['service'] + "-" + x['name'], prov)):
+		folderorservice = "service"
+		dstports = list(filter(lambda x: x['user'] == os.environ['USER'] and x['service'] + "-" + x['name'] == folderservice, ports))
+		if len(dstports) == 0:
+			print("For some reason the port is missing")
+			sys.exit(1)
+		dstport = dstports[0]['port']
+	else:
+		print('Unrecognized folder or service')
+		sys.exit(1)
+	
+	if type == "https":
+		if os.path.isfile(JOLT_GLOBAL + "/ssl/" + website + ".key") == False or os.path.isfile(JOLT_GLOBAL + "/ssl/" + website + ".crt") == False:
+			print("You must place a %s and %s file in %s" % (website + ".key", website + ".crt", JOLT_GLOBAL + "/ssl/") )
+			sys.exit(1)
+	elif type == "http":
+		1
+	else:
+		print("Type must be either http or https")
+		sys.exit(1)
+		
+	if os.path.isfile(JOLT_USER + "/" + wwwservice + "/vhosts/" + website + ".conf"):
+		print("Config file already exists. Not overwriting")
+		sys.exit(1)
+	
+	try:
+		output_file = open(JOLT_USER + "/" + wwwservice + "/vhosts/" + website + ".conf", "w")
+	except:
+		print("IO Error maybe")
+		sys.exit(1)
+	
+	output_file.write("server { \n")
+	output_file.write("listen 127.0.0.1:%d;\n" % wwwport)
+	output_file.write("server_name %s;\n" % website)
+	if folderorservice == "folder":
+		output_file.write("root \"%s\";\n}" % folderservice)
+	else:
+		output_file.write("location / {\n")
+		output_file.write("proxy_pass http://127.0.0.1:%d;\n}" % dstport)
+	output_file.close()
+	
+	wwws.append({ 'website' : website, 'type' : type, 'user' : os.environ['USER'], 'wwwservice' : wwwservice, 'name': folderservice })
+	saveWWWFile(wwws)	
+	os.system("kill -HUP `cat " + JOLT_USER + "/" + wwwservice + "/nginx.pid" + "` ")
+	
+
+if __name__ == "__main__":
+	if len(sys.argv) < 2:
+		print('Usage: %s <command>' % sys.argv[0])
+		print('where <command> is one of the following: %s' % ", ".join(COMMANDS))
+		sys.exit(1)
+
+	if sys.argv[1] == 'init':
+		runInit()
+	if sys.argv[1] == 'list':
+		runList()
+	if sys.argv[1] == 'ports':
+		if len(sys.argv) == 2:
+			runPortsList()
+		else:
+			if sys.argv[2] == 'new':
+				runPortsNew()
+			else:
+				print('Usage: %s ports <command>' % sys.argv[0])
+				print('where <command> is one of the following: new')
+				sys.exit(1)
+	if sys.argv[1] == 'new' :
+		runNew()
+	if sys.argv[1] == 'www':
+		if len(sys.argv) == 2:
+			runWWWList()
+		else:
+			if sys.argv[2] == 'new':
+				runWWWNew()
+			else:
+				print('Usage: %s www <command>' % sys.argv[0])
+				print('where <command> is one of the following: new')
+				sys.exit(1)
 
