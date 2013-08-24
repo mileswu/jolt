@@ -333,7 +333,10 @@ def runWWWNew():
 	else:
 		output_file.write("location / {\n")
 		output_file.write("proxy_pass http://127.0.0.1:%d;\n" % dstport)
-		output_file.write("}")
+		output_file.write("proxy_set_header X-Forwarded-For $http_x_forwarded_for;\n")
+		output_file.write("}\n")
+	output_file.write("set_real_ip_from 127.0.0.1;\n")
+	output_file.write("real_ip_header X-Forwarded-For;\n")
 	output_file.write("}")
 	output_file.close()
 	
