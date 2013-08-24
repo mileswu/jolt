@@ -267,7 +267,7 @@ def runWWWNew():
 		sys.exit(1)
 	
 	prov = loadProvisionedFile()
-	if re.match('[\*\w\.]+$', website) == None:
+	if re.match('[\*\w\-\.]+$', website) == None:
 		print('Website invalid format')
 		sys.exit(1)
 	
