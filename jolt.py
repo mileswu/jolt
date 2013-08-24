@@ -294,7 +294,7 @@ def runWWWNew():
 	if os.path.isdir(folderservice):
 		folderorservice = "folder"
 		folderservice = os.path.abspath(folderservice)
-	elif folderservice in list(map(lambda x: x['service'] + "-" + x['name'], prov)):
+	elif folderservice in list(map(lambda x: x['service'] + "-" + x['name'], filter(lambda x: x['user'] == os.environ['USER'], ports))):
 		folderorservice = "service"
 		dstports = list(filter(lambda x: x['user'] == os.environ['USER'] and x['service'] + "-" + x['name'] == folderservice, ports))
 		if len(dstports) == 0:
@@ -329,10 +329,12 @@ def runWWWNew():
 	output_file.write("listen 127.0.0.1:%d;\n" % wwwport)
 	output_file.write("server_name %s;\n" % website)
 	if folderorservice == "folder":
-		output_file.write("root \"%s\";\n}" % folderservice)
+		output_file.write("root \"%s\";\n" % folderservice)
 	else:
 		output_file.write("location / {\n")
-		output_file.write("proxy_pass http://127.0.0.1:%d;\n}" % dstport)
+		output_file.write("proxy_pass http://127.0.0.1:%d;\n" % dstport)
+		output_file.write("}")
+	output_file.write("}")
 	output_file.close()
 	
 	wwws.append({ 'website' : website, 'type' : type, 'user' : os.environ['USER'], 'wwwservice' : wwwservice, 'name': folderservice })
