@@ -1,0 +1,5 @@
+check process mongo-__JOLTNAME__ with pidfile "__JOLTDIR__/mongo-__JOLTNAME__/mongo.pid"
+        start program = "/sbin/start-stop-daemon -S -p __JOLTDIR__/mongo-__JOLTNAME__/mongo.pid --exec /usr/bin/mongod -- --bind_ip 127.0.0.1 --port __PORT__ --logappend --logpath __JOLTDIR__/mongo-__JOLTNAME__/mongo.log --pidfilepath __JOLTDIR__/mongo-__JOLTNAME__/mongo.pid --smallfiles --dbpath __JOLTDIR__/mongo-__JOLTNAME__/db --unixSocketPrefix __JOLTDIR__/mongo-__JOLTNAME__"
+        stop program = "/sbin/start-stop-daemon -K -p __JOLTDIR__/mongo-__JOLTNAME__/mongo.pid"
+        mode active
+        if 5 restarts within 10 cycles then stop
