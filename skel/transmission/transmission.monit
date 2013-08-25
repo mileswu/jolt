@@ -1,0 +1,5 @@
+check process transmission-__JOLTNAME__ with pidfile "__JOLTDIR__/transmission-__JOLTNAME__/transmission.pid"
+        start program = "/sbin/start-stop-daemon -S -p __JOLTDIR__/transmission-__JOLTNAME__/transmission.pid --exec /usr/bin/transmission-daemon -- --pid-file __JOLTDIR__/transmission-__JOLTNAME__/transmission.pid -g __JOLTDIR__/transmission-__JOLTNAME__/"
+        stop program = "/sbin/start-stop-daemon -K -p __JOLTDIR__/transmission-__JOLTNAME__/transmission.pid"
+        mode active
+        if 5 restarts within 10 cycles then stop
