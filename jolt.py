@@ -262,9 +262,15 @@ def runWWWNew():
 	folderservice = sys.argv[5]
 	
 	wwws = loadWWWFile()
-	if website in list(map(lambda x: x['website'], wwws)):
-		print('This website is already registered')
-		sys.exit(1)
+	if website != "shared":
+		if website in list(map(lambda x: x['website'], wwws)):
+			print('This website is already registered')
+			sys.exit(1)
+	else:
+		type = "http"
+		if website in list(map(lambda x: x['website'], filter(lambda x: x['user'] == os.environ['USER'], wwws))):
+			print('This website is already registered')
+			sys.exit(1)
 	
 	prov = loadProvisionedFile()
 	if re.match('[\*\w\-\.]+$', website) == None:
@@ -326,8 +332,13 @@ def runWWWNew():
 		sys.exit(1)
 	
 	output_file.write("server { \n")
-	output_file.write("listen 127.0.0.1:%d;\n" % wwwport)
-	output_file.write("server_name %s;\n" % website)
+	if website != "shared":
+		output_file.write("listen 127.0.0.1:%d;\n" % wwwport)
+		output_file.write("server_name %s;\n" % website)
+	else:
+		output_file.write("listen 127.0.0.1:%d default_server;\n" % wwwport)
+		output_file.write("server_name yuuko.w00.eu;\n")
+	
 	if folderorservice == "folder":
 		output_file.write("root \"%s\";\n" % folderservice)
 	else:
